@@ -47,11 +47,8 @@ public class AssemblyEntity extends Entity {
         if (!getWorld().isClient()) {
             if (assemblyID != null) {
                 CreateEngineers.SERVER.execute(() -> {
-                    CreateEngineers.LOGGER.info("TICK");
                     AssemblyDimensionManager.tickWorld(assemblyID);
                 });
-            } else {
-                CreateEngineers.LOGGER.info("cant tick no dim");
             }
         }
     }
