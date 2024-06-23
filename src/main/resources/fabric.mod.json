@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "createengineers",
+  "version": "${version}",
+  "name": "Create: Engineers",
+  "description": "",
+  "authors": [],
+  "contact": {
+    "repo": "https://github.com/Maks_gaming/createengineers"
+  },
+  "license": "MIT",
+  "icon": "assets/createengineers/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "ru.mgc.createengineers.client.CreateEngineersClient"
+    ],
+    "main": [
+      "ru.mgc.createengineers.CreateEngineers"
+    ]
+  },
+  "mixins": [
+    "createengineers.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
