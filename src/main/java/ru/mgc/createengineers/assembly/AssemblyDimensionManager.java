@@ -15,6 +15,7 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.dimension.DimensionTypes;
+import org.jetbrains.annotations.NotNull;
 import ru.mgc.createengineers.CreateEngineers;
 import ru.mgc.createengineers.CreateEngineersNetworking;
 import ru.mgc.createengineers.entity.AssemblyEntity;
@@ -42,15 +43,15 @@ public class AssemblyDimensionManager {
         EntityTrackingEvents.START_TRACKING.register((entity, player) -> {
             if (!(entity instanceof AssemblyEntity)) return;
 
-            if (!isWorldLoaded(((AssemblyEntity) entity).getAssemblyID())) {
-                loadWorld(((AssemblyEntity) entity).getAssemblyID());
-            }
-
             onStartTracking((AssemblyEntity) entity, player);
         });
     }
 
     private static void onStartTracking(AssemblyEntity entity, ServerPlayerEntity player) {
+        if (!isWorldLoaded(entity.getAssemblyID())) {
+            loadWorld(entity.getAssemblyID());
+        }
+
         PacketByteBuf buf = PacketByteBufs.create();
         AssemblyDimensionManager.putWorld(buf, (entity).getAssemblyID());
         ServerPlayNetworking.send(player, CreateEngineersNetworking.AssemblyWorldS2CPacket, buf);
@@ -60,10 +61,11 @@ public class AssemblyDimensionManager {
         return loadedDataManagers.get(assemblyId);
     }
 
-    public static void tickWorld(String assemblyId) {
+    public static void tickWorld(AssemblyEntity entity, String assemblyId) {
         if (!isWorldLoaded(assemblyId)) return;
 
         ServerWorld world = getWorld(assemblyId).asWorld();
+        world.setTimeOfDay(entity.getWorld().getTimeOfDay());
         world.tick(() -> false);
     }
 
@@ -94,14 +96,6 @@ public class AssemblyDimensionManager {
     Returns world handle
      */
     public static RuntimeWorldHandle getWorld(String id) {
-        if (!CreateEngineers.SERVER.isOnThread()) {
-            try {
-                throw new Exception("WRONG THREAD WORKING WITH WORLDS!!!");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
         if (loadedWorlds.containsKey(id)) {
             return loadedWorlds.get(id);
         } else {
@@ -109,11 +103,14 @@ public class AssemblyDimensionManager {
         }
     }
 
-    public static RuntimeWorldHandle loadWorld(String assemblyId) {
+    /*
+    Loads world and forces chunks
+     */
+    public static @NotNull RuntimeWorldHandle loadWorld(String assemblyId) {
         CreateEngineers.LOGGER.info("Loading assembly world \"{}\"", assemblyId);
         RuntimeWorldHandle handle = getFantasy().getOrOpenPersistentWorld(new Identifier(CreateEngineers.MOD_ID, assemblyId), getFantasyConfig());
-        loadedWorlds.put(assemblyId, handle);
         ServerWorld world = handle.asWorld();
+        loadedWorlds.put(assemblyId, handle);
         loadedDataManagers.put(assemblyId, world.getPersistentStateManager().getOrCreate(AssemblyPersistentState::createFromNbt, AssemblyPersistentState::new, "assemblies_data"));
 
         // Updating assembly world forced chunks
@@ -129,28 +126,21 @@ public class AssemblyDimensionManager {
      */
     private static void unloadWorld(String id) {
         CreateEngineers.LOGGER.info("Unloading assembly world \"{}\"", id);
-        getWorld(id).unload();
+        RuntimeWorldHandle world = getWorld(id);
         loadedWorlds.remove(id);
         loadedDataManagers.remove(id);
+        world.unload();
     }
 
     /*
     Deletes world from files
      */
     public static void deleteWorld(String id) {
-        if (!CreateEngineers.SERVER.isOnThread()) {
-            try {
-                throw new Exception("WRONG THREAD WORKING WITH WORLDS!!!");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
         CreateEngineers.LOGGER.info("Deleting server side world of assembly \"{}\"...", id);
         RuntimeWorldHandle world = getWorld(id);
-        world.delete();
         loadedWorlds.remove(id);
         loadedDataManagers.remove(id);
+        world.delete();
     }
 
     private static RuntimeWorldConfig getFantasyConfig() {

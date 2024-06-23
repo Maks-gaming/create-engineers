@@ -8,6 +8,7 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.listener.ClientPlayPacketListener;
 import net.minecraft.network.packet.Packet;
+import net.minecraft.util.math.Box;
 import net.minecraft.world.World;
 import ru.mgc.createengineers.CreateEngineers;
 import ru.mgc.createengineers.CreateEngineersNetworking;
@@ -33,11 +34,11 @@ public class AssemblyEntity extends Entity {
     protected void initDataTracker() {
     }
 
-//    @Override
-//    protected Box calculateBoundingBox() {
-//        // TODO: calculate
-//        return super.calculateBoundingBox();
-//    }
+    @Override
+    protected Box calculateBoundingBox() {
+        // TODO: calculate
+        return super.calculateBoundingBox();
+    }
 
     @Override
     public void tick() {
@@ -46,9 +47,7 @@ public class AssemblyEntity extends Entity {
         // Server dimension tick
         if (!getWorld().isClient()) {
             if (assemblyID != null) {
-                CreateEngineers.SERVER.execute(() -> {
-                    AssemblyDimensionManager.tickWorld(assemblyID);
-                });
+                CreateEngineers.SERVER.execute(() -> AssemblyDimensionManager.tickWorld(this, assemblyID));
             }
         }
     }
