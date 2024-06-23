@@ -35,6 +35,7 @@ public class AssemblyDimensionManager {
     public static void initialize() {
         ServerEntityEvents.ENTITY_UNLOAD.register((entity, world) -> {
             if (!(entity instanceof AssemblyEntity)) return;
+            if (entity.isRemoved()) return;
 
             unloadWorld(((AssemblyEntity) entity).getAssemblyID());
         });
@@ -134,6 +135,7 @@ public class AssemblyDimensionManager {
 
     /*
     Deletes world from files
+    TODO: Fix it actually (it is not working on entity kill)
      */
     public static void deleteWorld(String id) {
         CreateEngineers.LOGGER.info("Deleting server side world of assembly \"{}\"...", id);
