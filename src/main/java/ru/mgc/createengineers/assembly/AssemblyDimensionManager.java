@@ -62,7 +62,8 @@ public class AssemblyDimensionManager {
         return loadedDataManagers.get(assemblyId);
     }
 
-    public static void tickWorld(AssemblyEntity entity, String assemblyId) {
+    public static void tickWorld(AssemblyEntity entity) {
+        String assemblyId = entity.getAssemblyID();
         if (!isWorldLoaded(assemblyId)) return;
 
         ServerWorld world = getWorld(assemblyId).asWorld();

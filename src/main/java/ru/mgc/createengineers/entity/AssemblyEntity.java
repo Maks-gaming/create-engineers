@@ -45,10 +45,8 @@ public class AssemblyEntity extends Entity {
         super.tick();
 
         // Server dimension tick
-        if (!getWorld().isClient()) {
-            if (assemblyID != null) {
-                CreateEngineers.SERVER.execute(() -> AssemblyDimensionManager.tickWorld(this, assemblyID));
-            }
+        if (!getWorld().isClient() && assemblyID != null) {
+            CreateEngineers.SERVER.execute(() -> AssemblyDimensionManager.tickWorld(this));
         }
     }
 

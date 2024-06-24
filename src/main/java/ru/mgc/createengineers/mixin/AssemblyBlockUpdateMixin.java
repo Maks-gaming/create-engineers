@@ -52,11 +52,16 @@ public abstract class AssemblyBlockUpdateMixin extends World {
         String assemblyID = this.getRegistryKey().getValue().getPath();
         Chunk chunk = this.getChunk(pos);
 
+        // Do nothing if not loaded
+        if (!AssemblyDimensionManager.isWorldLoaded(assemblyID)) return;
+
         // Add chunks
         AssemblyPersistentState assemblyDataManager = AssemblyDimensionManager.getAssemblyDataManager(assemblyID);
         assemblyDataManager.addChunkPosition(chunk.getPos());
 
         ServerWorld entityWorld = CreateEngineers.SERVER.getWorld(RegistryKey.of(RegistryKeys.WORLD, assemblyDataManager.getWorldIdentifier()));
+
+        // World is not loaded
         if (entityWorld == null) return;
 
         // Getting entity
