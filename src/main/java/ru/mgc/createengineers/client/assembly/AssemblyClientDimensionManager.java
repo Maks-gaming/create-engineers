@@ -1,6 +1,6 @@
 package ru.mgc.createengineers.client.assembly;
 
-import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import io.github.fabricators_of_create.porting_lib.event.client.ClientWorldEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.block.Block;
@@ -34,9 +34,10 @@ public class AssemblyClientDimensionManager {
         ClientPlayNetworking.registerGlobalReceiver(CreateEngineersNetworking.AssemblyBlockUpdateS2CPacket, this::unpackBlockUpdatePacket);
         ClientPlayNetworking.registerGlobalReceiver(CreateEngineersNetworking.AssemblyWorldS2CPacket, this::unpackWorldPacket);
 
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+        ClientWorldEvents.UNLOAD.register((handler, client) -> {
             CreateEngineers.LOGGER.info("Cleaning assemblies..");
             assemblyWorlds.clear();
+            worldChunks.clear();
         });
     }
 
@@ -103,6 +104,7 @@ public class AssemblyClientDimensionManager {
     public void deleteWorld(String assemblyID) {
         CreateEngineers.LOGGER.info("Deleting client world of assembly \"{}\"...", assemblyID);
         assemblyWorlds.remove(assemblyID);
+        worldChunks.remove(assemblyID);
     }
 
     public ClientWorld getWorld(String assemblyID) {
