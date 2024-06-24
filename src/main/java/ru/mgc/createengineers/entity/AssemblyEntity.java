@@ -46,7 +46,7 @@ public class AssemblyEntity extends Entity {
 
         // Server dimension tick
         if (!getWorld().isClient() && assemblyID != null) {
-            CreateEngineers.SERVER.execute(() -> AssemblyDimensionManager.tickWorld(this));
+            CreateEngineers.SERVER.execute(() -> AssemblyDimensionManager.tickAssemblyEntity(this));
         }
     }
 
@@ -67,7 +67,7 @@ public class AssemblyEntity extends Entity {
     @Override
     public void remove(RemovalReason reason) {
         // Server-side removal
-        CreateEngineers.SERVER.execute(() -> AssemblyDimensionManager.deleteWorld(this.getAssemblyID()));
+        AssemblyDimensionManager.deleteWorld(assemblyID);
 
         super.remove(reason);
     }

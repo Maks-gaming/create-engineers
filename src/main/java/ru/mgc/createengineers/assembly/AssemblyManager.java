@@ -23,9 +23,9 @@ public class AssemblyManager {
         String assemblyID = UUID.randomUUID().toString();
 
         // Get the target world handle and data manager for the assembly
-        RuntimeWorldHandle targetWorldHandle = AssemblyDimensionManager.getWorld(assemblyID);
-        AssemblyPersistentState assemblyDataManager = AssemblyDimensionManager.getAssemblyDataManager(assemblyID);
-        ServerWorld targetWorld = targetWorldHandle.asWorld();
+        RuntimeWorldHandle handle = AssemblyDimensionManager.loadWorld(assemblyID);
+        AssemblyPersistentState assemblyDataManager = AssemblyDimensionManager.getPersistentState(handle);
+        ServerWorld targetWorld = handle.asWorld();
 
         for (BlockPos originPosition : blockPositions) {
             // Calculate the target position in the target world

@@ -28,6 +28,7 @@ import ru.mgc.createengineers.assembly.AssemblyDimensionManager;
 import ru.mgc.createengineers.assembly.AssemblyPersistentState;
 import ru.mgc.createengineers.entity.AssemblyEntity;
 import ru.mgc.createengineers.util.EntityUtils;
+import xyz.nucleoid.fantasy.RuntimeWorldHandle;
 
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -53,10 +54,11 @@ public abstract class AssemblyBlockUpdateMixin extends World {
         Chunk chunk = this.getChunk(pos);
 
         // Do nothing if not loaded
-        if (!AssemblyDimensionManager.isWorldLoaded(assemblyID)) return;
+        if (!AssemblyDimensionManager.isLoaded(assemblyID)) return;
 
         // Add chunks
-        AssemblyPersistentState assemblyDataManager = AssemblyDimensionManager.getAssemblyDataManager(assemblyID);
+        RuntimeWorldHandle handle = AssemblyDimensionManager.getWorld(assemblyID);
+        AssemblyPersistentState assemblyDataManager = AssemblyDimensionManager.getPersistentState(handle);
         assemblyDataManager.addChunkPosition(chunk.getPos());
 
         ServerWorld entityWorld = CreateEngineers.SERVER.getWorld(RegistryKey.of(RegistryKeys.WORLD, assemblyDataManager.getWorldIdentifier()));

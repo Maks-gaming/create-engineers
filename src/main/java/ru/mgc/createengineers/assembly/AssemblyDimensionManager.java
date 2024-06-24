@@ -1,13 +1,13 @@
 package ru.mgc.createengineers.assembly;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.s2c.play.ChunkData;
 import net.minecraft.registry.RegistryKeys;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.ChunkPos;
@@ -15,7 +15,6 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.dimension.DimensionTypes;
-import org.jetbrains.annotations.NotNull;
 import ru.mgc.createengineers.CreateEngineers;
 import ru.mgc.createengineers.CreateEngineersNetworking;
 import ru.mgc.createengineers.entity.AssemblyEntity;
@@ -24,15 +23,19 @@ import xyz.nucleoid.fantasy.RuntimeWorldConfig;
 import xyz.nucleoid.fantasy.RuntimeWorldHandle;
 import xyz.nucleoid.fantasy.util.VoidChunkGenerator;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
 public class AssemblyDimensionManager {
     private static final HashMap<String, RuntimeWorldHandle> loadedWorlds = new HashMap<>();
-    private static final HashMap<String, AssemblyPersistentState> loadedDataManagers = new HashMap<>();
+    private static Fantasy fantasy;
 
     public static void initialize() {
+        /*
+        Entity unload from world
+         */
         ServerEntityEvents.ENTITY_UNLOAD.register((entity, world) -> {
             if (!(entity instanceof AssemblyEntity)) return;
             if (entity.isRemoved()) return;
@@ -40,44 +43,65 @@ public class AssemblyDimensionManager {
             unloadWorld(((AssemblyEntity) entity).getAssemblyID());
         });
 
-        // Load entity
+        /*
+        Server start
+         */
+        ServerLifecycleEvents.SERVER_STARTED.register((server) -> {
+            fantasy = Fantasy.get(server);
+        });
+
+        /*
+        Server stop
+         */
+        ServerLifecycleEvents.SERVER_STOPPING.register((listener) -> {
+            CreateEngineers.LOGGER.info("Unloading all server assembly worlds");
+            loadedWorlds.clear();
+        });
+
+        /*
+        Entity load by player
+         */
         EntityTrackingEvents.START_TRACKING.register((entity, player) -> {
             if (!(entity instanceof AssemblyEntity)) return;
 
-            onStartTracking((AssemblyEntity) entity, player);
+            if (!isLoaded(((AssemblyEntity) entity).getAssemblyID())) {
+                loadWorld(((AssemblyEntity) entity).getAssemblyID());
+            }
+
+            PacketByteBuf buf = PacketByteBufs.create();
+            AssemblyDimensionManager.putWorld(buf, ((AssemblyEntity) entity).getAssemblyID());
+            ServerPlayNetworking.send(player, CreateEngineersNetworking.AssemblyWorldS2CPacket, buf);
         });
     }
 
-    private static void onStartTracking(AssemblyEntity entity, ServerPlayerEntity player) {
-        if (!isWorldLoaded(entity.getAssemblyID())) {
-            loadWorld(entity.getAssemblyID());
-        }
-
-        PacketByteBuf buf = PacketByteBufs.create();
-        AssemblyDimensionManager.putWorld(buf, (entity).getAssemblyID());
-        ServerPlayNetworking.send(player, CreateEngineersNetworking.AssemblyWorldS2CPacket, buf);
-    }
-
-    public static AssemblyPersistentState getAssemblyDataManager(String assemblyId) {
-        return loadedDataManagers.get(assemblyId);
-    }
-
-    public static void tickWorld(AssemblyEntity entity) {
+    /*
+    Tick world attached to entity
+     */
+    public static void tickAssemblyEntity(AssemblyEntity entity) {
         String assemblyId = entity.getAssemblyID();
-        if (!isWorldLoaded(assemblyId)) return;
+        if (!isLoaded(assemblyId)) return;
 
         ServerWorld world = getWorld(assemblyId).asWorld();
         world.setTimeOfDay(entity.getWorld().getTimeOfDay());
         world.tick(() -> false);
     }
 
-    public static boolean isWorldLoaded(String assemblyId) {
+    /*
+    Get assembly's world persistent state (datastore)
+     */
+    public static AssemblyPersistentState getPersistentState(RuntimeWorldHandle handle) {
+        return handle.asWorld().getPersistentStateManager().getOrCreate(AssemblyPersistentState::createFromNbt, AssemblyPersistentState::new, "assemblies_data");
+    }
+
+
+    public static boolean isLoaded(String assemblyId) {
         return loadedWorlds.containsKey(assemblyId);
     }
 
     public static void putWorld(PacketByteBuf buf, String assemblyId) {
+        RuntimeWorldHandle handle = AssemblyDimensionManager.getWorld(assemblyId);
         List<WorldChunk> chunks = new ArrayList<>();
-        List<ChunkPos> chunkPositions = AssemblyDimensionManager.getAssemblyDataManager(assemblyId).getChunksPositions();
+        List<ChunkPos> chunkPositions = AssemblyDimensionManager.getPersistentState(handle).getChunksPositions();
         for (ChunkPos chunkPos : chunkPositions) {
             chunks.add(AssemblyDimensionManager.getWorld(assemblyId).asWorld().getChunk(chunkPos.x, chunkPos.z));
         }
@@ -95,28 +119,28 @@ public class AssemblyDimensionManager {
     }
 
     /*
-    Returns world handle
+    Returns world handle if loaded
      */
+    @Nullable
     public static RuntimeWorldHandle getWorld(String id) {
-        if (loadedWorlds.containsKey(id)) {
-            return loadedWorlds.get(id);
-        } else {
-            return loadWorld(id);
-        }
+        return loadedWorlds.get(id);
     }
 
     /*
     Loads world and forces chunks
      */
-    public static @NotNull RuntimeWorldHandle loadWorld(String assemblyId) {
+    public static RuntimeWorldHandle loadWorld(String assemblyId) {
         CreateEngineers.LOGGER.info("Loading assembly world \"{}\"", assemblyId);
-        RuntimeWorldHandle handle = getFantasy().getOrOpenPersistentWorld(new Identifier(CreateEngineers.MOD_ID, assemblyId), getFantasyConfig());
+
+        RuntimeWorldHandle handle = fantasy.getOrOpenPersistentWorld(new Identifier(CreateEngineers.MOD_ID, assemblyId), getFantasyConfig());
+        AssemblyPersistentState state = getPersistentState(handle);
         ServerWorld world = handle.asWorld();
+
+        handle.setTickWhenEmpty(false);
         loadedWorlds.put(assemblyId, handle);
-        loadedDataManagers.put(assemblyId, world.getPersistentStateManager().getOrCreate(AssemblyPersistentState::createFromNbt, AssemblyPersistentState::new, "assemblies_data"));
 
         // Updating assembly world forced chunks
-        for (ChunkPos pos : getAssemblyDataManager(assemblyId).getChunksPositions()) {
+        for (ChunkPos pos : state.getChunksPositions()) {
             world.setChunkForced(pos.x, pos.z, true);
         }
 
@@ -127,23 +151,33 @@ public class AssemblyDimensionManager {
     Unloads world from runtime
      */
     private static void unloadWorld(String id) {
+        if (!isLoaded(id)) return;
+
         CreateEngineers.LOGGER.info("Unloading assembly world \"{}\"", id);
-        RuntimeWorldHandle world = getWorld(id);
+
+        RuntimeWorldHandle handle = loadedWorlds.get(id);
+        AssemblyPersistentState state = getPersistentState(handle);
+        ServerWorld world = handle.asWorld();
+
+        // No force for all chunks
+        for (ChunkPos pos : state.getChunksPositions()) {
+            world.setChunkForced(pos.x, pos.z, false);
+        }
+        
         loadedWorlds.remove(id);
-        loadedDataManagers.remove(id);
-        world.unload();
+        handle.unload();
     }
 
     /*
     Deletes world from files
-    TODO: Fix it actually (it is not working on entity kill)
      */
     public static void deleteWorld(String id) {
+        if (!isLoaded(id)) return;
+
         CreateEngineers.LOGGER.info("Deleting server side world of assembly \"{}\"...", id);
-        RuntimeWorldHandle world = getWorld(id);
-        loadedWorlds.remove(id);
-        loadedDataManagers.remove(id);
-        world.delete();
+        RuntimeWorldHandle handle = loadedWorlds.get(id);
+        unloadWorld(id);
+        handle.delete();
     }
 
     private static RuntimeWorldConfig getFantasyConfig() {
@@ -156,9 +190,5 @@ public class AssemblyDimensionManager {
                 .setGenerator(new VoidChunkGenerator(
                         CreateEngineers.SERVER.getRegistryManager().get(RegistryKeys.BIOME).getEntry(0).get()))
                 .setSeed(1234L);
-    }
-
-    private static Fantasy getFantasy() {
-        return Fantasy.get(CreateEngineers.SERVER);
     }
 }
